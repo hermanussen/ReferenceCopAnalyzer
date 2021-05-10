@@ -20,6 +20,8 @@ namespace ReferenceCopAnalyzer
 
         public const string RulesFileName = ".refrules";
 
+        private const string RuleSeparator = " ";
+
         private static readonly DiagnosticDescriptor ReferenceNotAllowedDiagnostic = new (
             ReferenceNotAllowedDiagnosticId,
             "Reference is not allowed.",
@@ -38,15 +40,10 @@ namespace ReferenceCopAnalyzer
             isEnabledByDefault: true,
             description: "Reference is not allowed.");
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
-        {
-            get
-            {
-                return ImmutableArray.Create(
-                    ReferenceNotAllowedDiagnostic,
-                    MultipleRulesFilesFoundDiagnostic);
-            }
-        }
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+            ImmutableArray.Create(
+                ReferenceNotAllowedDiagnostic,
+                MultipleRulesFilesFoundDiagnostic);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -78,10 +75,10 @@ namespace ReferenceCopAnalyzer
                 List<KeyValuePair<string,string>> allowedReferences = new ();
                 foreach (var line in rulesFiles.First().GetText().Lines
                     .Select(l => l.Text.ToString())
-                    .Where(l => !string.IsNullOrWhiteSpace(l) && l.Contains(">")))
+                    .Where(l => !string.IsNullOrWhiteSpace(l) && l.Contains(RuleSeparator)))
                 {
                     var sourceAndTarget = line
-                        .Split(new [] { '>' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Split(new [] { RuleSeparator }, StringSplitOptions.RemoveEmptyEntries)
                         .Select(s => s.Trim())
                         .ToArray();
                     if (sourceAndTarget.Length != 2)
@@ -100,7 +97,7 @@ namespace ReferenceCopAnalyzer
 
                         if (!allowedReferences.Any(r => r.Key == sourceName && r.Value == targetName))
                         {
-                            var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, null, sourceName, targetName);
+                            var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
                             modelContext.ReportDiagnostic(diagnostic);
                         }
@@ -109,16 +106,44 @@ namespace ReferenceCopAnalyzer
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
                 {
                     var u = (QualifiedNameSyntax) modelContext.Node;
+
+                    var parentSyntaxKind = u.Parent.Kind();
+                    if (parentSyntaxKind == SyntaxKind.NamespaceDeclaration)
+                    {
+                        // No need to check the namespace declaration itself
+                        return;
+                    }
+
+                    if (parentSyntaxKind == SyntaxKind.QualifiedName)
+                    {
+                        // No need to check lesser depth qualified name
+                        return;
+                    }
+
                     var targetName = u.Left.ToFullString().Trim();
                     var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
 
                     if (!allowedReferences.Any(r => r.Key == sourceName && r.Value == targetName))
                     {
-                        var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, null, sourceName, targetName);
+                        var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
                         modelContext.ReportDiagnostic(diagnostic);
                     }
                 }, SyntaxKind.QualifiedName);
+
+                //compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
+                //{
+                //    var u = (MemberAccessExpressionSyntax)modelContext.Node;
+                //    var targetName = u.ToFullString().Trim();
+                //    var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
+
+                //    if (!allowedReferences.Any(r => r.Key == sourceName && r.Value == targetName))
+                //    {
+                //        var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+
+                //        modelContext.ReportDiagnostic(diagnostic);
+                //    }
+                //}, SyntaxKind.SimpleMemberAccessExpression);
             });
         }
     }
