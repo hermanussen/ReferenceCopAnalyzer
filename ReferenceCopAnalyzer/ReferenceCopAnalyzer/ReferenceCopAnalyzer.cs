@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace ReferenceCopAnalyzer
@@ -94,8 +95,8 @@ namespace ReferenceCopAnalyzer
                         var u = (UsingDirectiveSyntax) modelContext.Node;
                         var targetName = u.Name.ToFullString().Trim();
                         var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
-
-                        if (!allowedReferences.Any(r => r.Key == sourceName && r.Value == targetName))
+                        
+                        if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                         {
                             var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
@@ -123,28 +124,32 @@ namespace ReferenceCopAnalyzer
                     var targetName = u.Left.ToFullString().Trim();
                     var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
 
-                    if (!allowedReferences.Any(r => r.Key == sourceName && r.Value == targetName))
+                    if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                     {
                         var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
                         modelContext.ReportDiagnostic(diagnostic);
                     }
                 }, SyntaxKind.QualifiedName);
-
-                //compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
-                //{
-                //    var u = (MemberAccessExpressionSyntax)modelContext.Node;
-                //    var targetName = u.ToFullString().Trim();
-                //    var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
-
-                //    if (!allowedReferences.Any(r => r.Key == sourceName && r.Value == targetName))
-                //    {
-                //        var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
-
-                //        modelContext.ReportDiagnostic(diagnostic);
-                //    }
-                //}, SyntaxKind.SimpleMemberAccessExpression);
             });
+        }
+
+        private static bool IsAllowedReference(List<KeyValuePair<string, string>> allowedReferences, string sourceName, string targetName)
+        {
+            return allowedReferences.Any(r =>
+                IsMatch(r.Key, sourceName)
+                && IsMatch(r.Value, targetName));
+        }
+
+        private static bool IsMatch(string pattern, string reference)
+        {
+            return pattern == reference || Regex.IsMatch(reference, WildCardToRegular(pattern));
+        }
+
+        private static string WildCardToRegular(string value)
+        {
+            // Based on https://stackoverflow.com/a/30300521
+            return $"^{Regex.Escape(value).Replace("\\*", ".*")}$";
         }
     }
 }

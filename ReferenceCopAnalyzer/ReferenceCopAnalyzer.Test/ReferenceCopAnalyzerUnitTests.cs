@@ -89,6 +89,7 @@ namespace B {
         [InlineData(ReferenceQualified, "A B", 8, 17, 8, 21, new[] { "B", "A" })]
         [InlineData(ReferenceQualifiedDeeper, "A.Z B", 8, 17, 8, 23, new[] { "B", "A.Z" })]
         [InlineData(ReferenceQualifiedDeepest, "X.Y.Z B", 8, 17, 8, 25, new[] { "B", "X.Y.Z" })]
+        [InlineData(ReferenceQualifiedDeepest, "X.*.Z B", 8, 17, 8, 25, new[] { "B", "X.Y.Z" })]
         public async Task ShouldReportIllegalReference(
             string source,
             string rules,
@@ -121,6 +122,7 @@ namespace B {
         [InlineData(ReferenceQualified, "B A")]
         [InlineData(ReferenceQualifiedDeeper, "B A.Z")]
         [InlineData(ReferenceQualifiedDeepest, "B X.Y.Z")]
+        [InlineData(ReferenceQualifiedDeepest, "B X.*.Z")]
         public async Task ShouldNotReportIllegalReference(string source, string rules)
         {
             var additionalFiles = new NameValueCollection()
