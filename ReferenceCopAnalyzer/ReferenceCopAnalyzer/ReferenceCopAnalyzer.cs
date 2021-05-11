@@ -24,7 +24,7 @@ namespace ReferenceCopAnalyzer
 
         private static readonly DiagnosticDescriptor ReferenceNotAllowedDiagnostic = new (
             ReferenceNotAllowedDiagnosticId,
-            "Reference is not allowed.",
+            "Reference is not allowed",
             "A reference between '{0}' and '{1}' is not allowed according to the rules file",
             "ReferenceCop",
             DiagnosticSeverity.Error,
@@ -33,7 +33,7 @@ namespace ReferenceCopAnalyzer
 
         private static readonly DiagnosticDescriptor MultipleRulesFilesFoundDiagnostic = new(
             MultipleRulesFilesFoundDiagnosticId,
-            "Multiple rules files found.",
+            "Multiple rules files found",
             $"Found multiple {RulesFileName} files; please make sure there is only one",
             "ReferenceCop",
             DiagnosticSeverity.Error,
