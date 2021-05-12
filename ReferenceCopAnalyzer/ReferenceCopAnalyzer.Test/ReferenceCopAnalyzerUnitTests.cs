@@ -60,6 +60,55 @@ namespace B {
 }
 ";
 
+        private const string ReferenceInUsingWithAlias = @"
+namespace A.B.C
+{
+    public class X
+    {
+    }
+}
+namespace B
+{
+    using Z=A.B.C;
+
+    public class BB
+    {
+        private Z.X x;
+    }
+}
+";
+
+        private const string ReferenceInUsingWithAliasOutsideNamespace = @"
+using Z=A.B.C;
+
+namespace A.B.C
+{
+    public class X
+    {
+    }
+}
+
+namespace B
+{
+    public class BB
+    {
+        private Z.X x;
+    }
+}
+";
+
+        private const string ReferenceQualifiedWithGlobal = @"
+namespace X.Y.Z {
+    public class AA {
+    }
+}
+namespace B {
+    public class BB {
+        private global::X.Y.Z.AA a;
+    }
+}
+";
+
         [Fact]
         public async Task ShouldNotGetDiagnosticsIfEmpty()
         {
@@ -90,6 +139,9 @@ namespace B {
         [InlineData(ReferenceQualifiedDeeper, "A.Z B", 8, 17, 8, 23, new[] { "B", "A.Z" })]
         [InlineData(ReferenceQualifiedDeepest, "X.Y.Z B", 8, 17, 8, 25, new[] { "B", "X.Y.Z" })]
         [InlineData(ReferenceQualifiedDeepest, "X.*.Z B", 8, 17, 8, 25, new[] { "B", "X.Y.Z" })]
+        [InlineData(ReferenceInUsingWithAlias, "A.B.C B", 10, 5, 10, 19, new[] { "B", "A.B.C" })]
+        [InlineData(ReferenceInUsingWithAliasOutsideNamespace, "A.B.C B", 2, 1, 2, 15, new[] { "B", "A.B.C" })]
+        [InlineData(ReferenceQualifiedWithGlobal, "X.Y.Z B", 8, 17, 8, 33, new[] { "B", "global::X.Y.Z" })]
         public async Task ShouldReportIllegalReference(
             string source,
             string rules,
@@ -123,6 +175,9 @@ namespace B {
         [InlineData(ReferenceQualifiedDeeper, "B A.Z")]
         [InlineData(ReferenceQualifiedDeepest, "B X.Y.Z")]
         [InlineData(ReferenceQualifiedDeepest, "B X.*.Z")]
+        [InlineData(ReferenceInUsingWithAlias, "B A.B.C")]
+        [InlineData(ReferenceInUsingWithAliasOutsideNamespace, "B A.B.C")]
+        [InlineData(ReferenceQualifiedWithGlobal, "B X.Y.Z")]
         public async Task ShouldNotReportIllegalReference(string source, string rules)
         {
             var additionalFiles = new NameValueCollection()

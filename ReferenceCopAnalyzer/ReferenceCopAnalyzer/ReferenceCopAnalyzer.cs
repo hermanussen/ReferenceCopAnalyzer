@@ -95,6 +95,24 @@ namespace ReferenceCopAnalyzer
                         var u = (UsingDirectiveSyntax) modelContext.Node;
                         var targetName = u.Name.ToFullString().Trim();
                         var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
+
+                        if (sourceName == null)
+                        {
+                            // If the code is not in a namespace, it applies to all namespaces in the compilation unit
+                            var namespaces = u.Parent.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
+                            foreach (var ns in namespaces)
+                            {
+                                sourceName = ns.Name.ToFullString().Trim();
+                                if (!IsAllowedReference(allowedReferences, sourceName, targetName))
+                                {
+                                    var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+
+                                    modelContext.ReportDiagnostic(diagnostic);
+                                }
+                            }
+
+                            return;
+                        }
                         
                         if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                         {
@@ -109,20 +127,45 @@ namespace ReferenceCopAnalyzer
                     var u = (QualifiedNameSyntax) modelContext.Node;
 
                     var parentSyntaxKind = u.Parent.Kind();
-                    if (parentSyntaxKind == SyntaxKind.NamespaceDeclaration)
+                    switch (parentSyntaxKind)
                     {
                         // No need to check the namespace declaration itself
-                        return;
-                    }
-
-                    if (parentSyntaxKind == SyntaxKind.QualifiedName)
-                    {
+                        case SyntaxKind.NamespaceDeclaration:
                         // No need to check lesser depth qualified name
+                        case SyntaxKind.QualifiedName:
+                        // If it's part of a using, it's already checked in the previous syntax node action
+                        case SyntaxKind.UsingDirective:
+                            return;
+                    }
+                    
+                    var targetName = u.Left.ToFullString().Trim();
+
+                    var containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+                    if (containingNamespace == null
+                        || containingNamespace
+                            .ChildNodes()
+                            .OfType<UsingDirectiveSyntax>()
+                            .Any(d => d
+                                .ChildNodes()
+                                .OfType<NameEqualsSyntax>()
+                                .Any(n => n.Name.ToFullString() == targetName)))
+                    {
                         return;
                     }
 
-                    var targetName = u.Left.ToFullString().Trim();
-                    var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
+                    var containingCompilationUnit = u.FirstAncestorOrSelf<CompilationUnitSyntax>();
+                    if (containingCompilationUnit
+                            .ChildNodes()
+                            .OfType<UsingDirectiveSyntax>()
+                            .Any(d => d
+                                .ChildNodes()
+                                .OfType<NameEqualsSyntax>()
+                                .Any(n => n.Name.ToFullString() == targetName)))
+                    {
+                        return;
+                    }
+
+                    var sourceName = containingNamespace.Name.ToFullString().Trim();
 
                     if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                     {
@@ -136,6 +179,24 @@ namespace ReferenceCopAnalyzer
 
         private static bool IsAllowedReference(List<KeyValuePair<string, string>> allowedReferences, string sourceName, string targetName)
         {
+            const string global = "global::";
+            
+            if (sourceName.StartsWith(global))
+            {
+                sourceName = sourceName.Substring(global.Length);
+            }
+
+            if (targetName.StartsWith(global))
+            {
+                targetName = targetName.Substring(global.Length);
+            }
+
+            if (sourceName == targetName)
+            {
+                // Reference between the same namespace is always ok
+                return true;
+            }
+
             return allowedReferences.Any(r =>
                 IsMatch(r.Key, sourceName)
                 && IsMatch(r.Value, targetName));
