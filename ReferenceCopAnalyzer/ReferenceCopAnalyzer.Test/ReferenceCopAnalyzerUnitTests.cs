@@ -109,6 +109,36 @@ namespace B {
 }
 ";
 
+        private const string ReferenceNestedClass = @"
+namespace A {
+    public class AA {
+        public class Nested {
+        }
+    }
+}
+namespace B {
+    public class BB {
+        private A.AA.Nested a;
+    }
+}
+";
+
+        private const string ReferenceRelative = @"
+namespace One
+{
+    public class AA
+    {
+        private Two.BB b;
+    }
+}
+namespace One.Two
+{
+    public class BB
+    {
+    }
+}
+";
+
         [Fact]
         public async Task ShouldNotGetDiagnosticsIfEmpty()
         {
@@ -142,6 +172,8 @@ namespace B {
         [InlineData(ReferenceInUsingWithAlias, "A.B.C B", 10, 5, 10, 19, new[] { "B", "A.B.C" })]
         [InlineData(ReferenceInUsingWithAliasOutsideNamespace, "A.B.C B", 2, 1, 2, 15, new[] { "B", "A.B.C" })]
         [InlineData(ReferenceQualifiedWithGlobal, "X.Y.Z B", 8, 17, 8, 33, new[] { "B", "global::X.Y.Z" })]
+        [InlineData(ReferenceNestedClass, "A B", 10, 17, 10, 28, new[] { "B", "A" })]
+        [InlineData(ReferenceRelative, "A B", 10, 17, 10, 28, new[] { "B", "A" })]
         public async Task ShouldReportIllegalReference(
             string source,
             string rules,
@@ -178,6 +210,8 @@ namespace B {
         [InlineData(ReferenceInUsingWithAlias, "B A.B.C")]
         [InlineData(ReferenceInUsingWithAliasOutsideNamespace, "B A.B.C")]
         [InlineData(ReferenceQualifiedWithGlobal, "B X.Y.Z")]
+        [InlineData(ReferenceNestedClass, "B A")]
+        [InlineData(ReferenceRelative, "One One.Two")]
         public async Task ShouldNotReportIllegalReference(string source, string rules)
         {
             var additionalFiles = new NameValueCollection()

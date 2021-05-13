@@ -137,9 +137,30 @@ namespace ReferenceCopAnalyzer
                         case SyntaxKind.UsingDirective:
                             return;
                     }
-                    
-                    var targetName = u.Left.ToFullString().Trim();
 
+                    QualifiedNameSyntax targetSyntax = u;
+                    string targetName = null;
+                    do
+                    {
+                        if (targetSyntax.Left is QualifiedNameSyntax s)
+                        {
+                            targetSyntax = s;
+                            var sem = modelContext.SemanticModel.GetTypeInfo(targetSyntax);
+                            if (sem.Type == null)
+                            {
+                                targetName = targetSyntax.ToFullString().Trim();
+                            }
+                        }
+                        else if (targetSyntax.Left is IdentifierNameSyntax)
+                        {
+                            targetName = targetSyntax.Left.ToFullString().Trim();
+                        }
+                        else
+                        {
+                            return;
+                        }
+                    } while (targetName == null);
+                    
                     var containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
                     if (containingNamespace == null
                         || containingNamespace
