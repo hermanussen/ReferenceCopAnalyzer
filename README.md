@@ -1,5 +1,7 @@
 # ReferenceCopAnalyzer
 
+![publish to nuget](https://github.com/hermanussen/ReferenceCopAnalyzer/workflows/publish%20to%20nuget/badge.svg) [![Nuget](https://img.shields.io/nuget/v/ReferenceCopAnalyzer)](https://www.nuget.org/packages/ReferenceCopAnalyzer/)  [![Twitter URL](https://img.shields.io/twitter/url?style=social&url=https%3A%2F%2Ftwitter.com%2Fknifecore%2F)](https://twitter.com/knifecore)
+
 Analyzer that checks references from code to different namespaces in .NET, based on your own rules
 
 # About
