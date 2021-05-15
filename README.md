@@ -2,6 +2,17 @@
 
 Analyzer that checks references from code to different namespaces in .NET, based on your own rules
 
+# About
+
+If you are working on a code base with multiple developers and you have some ideas about how dependencies must flow, it is a good idea to translate those ideas to a set of rules. But checking those rules manually when changes are made can be cumbersome and error-prone.
+
+ReferenceCopAnalyzer allows you to define those rules in a separate file and will report anything in your code that violates the rules. It uses [a code analyzer](https://docs.microsoft.com/en-us/dotnet/framework/code-analyzers), which runs as part of the compilation process. That makes it easy to install, fast and well-integrated into your development tooling (IDE). Also, it requires no extra effort to setup in your CI build.
+
+Here's an example of a rule that is defined and a violation being reported in Visual Studio:
+![Example use](images/example_use.png)
+
+This project is heavily inspired by [NsDepCop](https://github.com/realvizu/NsDepCop), but a bit easier to use and it supports .NET Core (and .NET 5+).
+
 # Installation
 
 1. Install the NuGet package in your project. Run the following command in the NuGet package manager console
@@ -12,12 +23,13 @@ or using the .NET cli
 ```
 dotnet add package ReferenceCopAnalyzer
 ```
-2. Add a file called `.refrules` anywhere in your project and ensure that it is registered as an `AdditionalFile` in your project file. Alternatively, set `C# analyzer additional file` as the build action on the file properties in Visual Studio.
+2. Add a file called `.refrules` anywhere in your project and ensure that it is registered as an `AdditionalFile` in your project file.
 ```xml
 <ItemGroup>
   <AdditionalFiles Include=".refrules" />
 </ItemGroup>
 ```
+Alternatively, set `C# analyzer additional file` as the build action on the file properties in Visual Studio.
 
 You may notice errors already popping up. This is because there are no rules defined yet. Please proceed to the next section.
 
@@ -108,7 +120,19 @@ If you are familiar with [Sitecore Helix](https://helix.sitecore.com/principles/
 [ca].Project.[f].* [ca].Project.[f]
 ```
 
-# Advanced scenarios
+# Miscellaneous
+
+## Using statements that are not needed
+
+You may run into "false positives" for using statements that are not actually used. ReferenceCopAnalyzer will still report them, if they violate the rules.
+
+But since they aren't needed anyway, why not just remove them? And [IDE0005](https://docs.microsoft.com/en-us/dotnet/fundamentals/code-analysis/style-rules/ide0005) reports them (this analyzer comes with .NET 5+ by default, or can be [installed separately if needed](https://docs.microsoft.com/en-us/dotnet/fundamentals/code-analysis/overview)).
+
+If you really want to keep things clean, just set IDE0005 severity to 'error'. You just need to add a `.editorconfig` file and include the following:
+```
+# IDE0005: Using directive is unnecessary.
+dotnet_diagnostic.IDE0005.severity = error
+```
 
 ## Use the same rules for all projects
 
@@ -125,4 +149,4 @@ If you are familiar with [Sitecore Helix](https://helix.sitecore.com/principles/
 
 Example:
 
-![](images/azure_devops_reviewer_policy.png)
+![Azure DevOps reviewer policy](images/azure_devops_reviewer_policy.png)

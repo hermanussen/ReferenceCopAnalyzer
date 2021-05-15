@@ -135,7 +135,33 @@ namespace ReferenceCopAnalyzer
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
                     {
                         var u = (UsingDirectiveSyntax) modelContext.Node;
+                        
                         var targetName = u.Name.ToFullString().Trim();
+
+                        bool stripClass = false;
+
+                        // A static import has a reference to a class instead of a namespace, so that needs to be stripped
+                        if (u.ChildTokens().Any(n => n.IsKind(SyntaxKind.StaticKeyword)))
+                        {
+                            stripClass = true;
+                        }
+                        else if (u.ChildNodes().OfType<NameEqualsSyntax>().Any())
+                        {
+                            // If the alias references a class, that needs to be stripped
+                            var type = modelContext.SemanticModel
+                                .GetTypeInfo(u.ChildNodes().OfType<QualifiedNameSyntax>().First())
+                                .Type;
+                            if (type != null)
+                            {
+                                stripClass = true;
+                            }
+                        }
+
+                        if (stripClass)
+                        {
+                            targetName = u.ChildNodes().OfType<QualifiedNameSyntax>().FirstOrDefault()?.Left.ToFullString().Trim();
+                        }
+
                         var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
 
                         if (sourceName == null)
@@ -168,20 +194,26 @@ namespace ReferenceCopAnalyzer
                 {
                     var u = (QualifiedNameSyntax) modelContext.Node;
 
-                    if (u.Parent?.Kind() == SyntaxKind.QualifiedName)
+                    switch (u.Parent?.Kind())
                     {
                         // No need to check lesser depth qualified name
-                        return;
+                        case SyntaxKind.QualifiedName:
+                        // No need to check namespaces themselves
+                        case SyntaxKind.NamespaceDeclaration:
+                        // Using directives are checked in a different syntax action 
+                        case SyntaxKind.UsingDirective:
+                            return;
                     }
                     
                     string targetName = null;
-                    var typeInfo = modelContext.SemanticModel.GetTypeInfo(u);
-                    if (typeInfo.Type == null)
+                    var symbol = modelContext.SemanticModel.GetTypeInfo(u).Type
+                        ?? modelContext.SemanticModel.GetSymbolInfo(u).Symbol;
+                    if (symbol == null)
                     {
                         return;
                     }
 
-                    targetName = typeInfo.Type.ContainingNamespace.ToDisplayString();
+                    targetName = symbol.ContainingNamespace.ToDisplayString();
                     
                     var containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
                     if (containingNamespace == null)

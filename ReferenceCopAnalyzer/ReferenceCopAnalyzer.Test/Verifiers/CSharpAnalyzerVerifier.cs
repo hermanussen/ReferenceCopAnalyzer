@@ -39,6 +39,19 @@ namespace ReferenceCopAnalyzer.Test.Verifiers
             test.ExpectedDiagnostics.AddRange(expected);
             await test.RunAsync(CancellationToken.None);
         }
+        
+        public static async Task VerifyReferenceCopAnalysis(string source, string rules, DiagnosticResult[] diagnostics)
+        {
+            var additionalFiles = new NameValueCollection()
+            {
+                { ReferenceCopAnalyzer.RulesFileName, rules }
+            };
+
+            await VerifyAnalyzerAsync(
+                source,
+                additionalFiles,
+                diagnostics);
+        }
 
         public class Test : CSharpAnalyzerTest<TAnalyzer, MSTestVerifier>
         {

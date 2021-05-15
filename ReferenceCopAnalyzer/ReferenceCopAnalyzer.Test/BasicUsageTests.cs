@@ -10,7 +10,7 @@ using VerifyCS = ReferenceCopAnalyzer.Test.Verifiers.CSharpAnalyzerVerifier<Refe
 
 namespace ReferenceCopAnalyzer.Test
 {
-    public class ReferenceCopAnalyzerUnitTest
+    public class BasicUsageTests
     {
         private const string ReferenceInUsing = @"
 namespace A {
@@ -229,7 +229,7 @@ namespace A.B.C {
         [Fact]
         public async Task ShouldSupportMultipleRules()
         {
-            await Verify(ReferenceInUsingMultiple,
+            await VerifyCS.VerifyReferenceCopAnalysis(ReferenceInUsingMultiple,
                 @"A C
 B C",
                 new[]
@@ -248,7 +248,7 @@ B C",
         [Fact]
         public async Task ShouldReportIllegalReferenceInUsingWithAlias()
         {
-            await Verify(
+            await VerifyCS.VerifyReferenceCopAnalysis(
                 ReferenceInUsingWithAlias,
                 "A.B.C B",
                 new[]
@@ -267,7 +267,7 @@ B C",
         [Fact]
         public async Task ShouldReportIllegalReferenceInUsingWithAliasOutsideNamespace()
         {
-            await Verify(
+            await VerifyCS.VerifyReferenceCopAnalysis(
                 ReferenceInUsingWithAliasOutsideNamespace,
                 "A.B.C B",
                 new[]
@@ -303,7 +303,7 @@ B C",
             int endColumn,
             object[] arguments)
         {
-            await Verify(source, rules, new[]
+            await VerifyCS.VerifyReferenceCopAnalysis(source, rules, new[]
                 {
                     VerifyCS
                         .Diagnostic(ReferenceCopAnalyzer.ReferenceNotAllowedDiagnosticId)
@@ -337,20 +337,7 @@ A.X.A A.Y.B")]
         [InlineData(ReferenceInUsingWildcardMatchesDeep, @"A A.*")]
         public async Task ShouldNotReportIllegalReference(string source, string rules)
         {
-            await Verify(source, rules, Array.Empty<DiagnosticResult>());
-        }
-
-        private static async Task Verify(string source, string rules, DiagnosticResult[] diagnostics)
-        {
-            var additionalFiles = new NameValueCollection()
-            {
-                { ReferenceCopAnalyzer.RulesFileName, rules }
-            };
-
-            await VerifyCS.VerifyAnalyzerAsync(
-                source,
-                additionalFiles,
-                diagnostics);
+            await VerifyCS.VerifyReferenceCopAnalysis(source, rules, Array.Empty<DiagnosticResult>());
         }
     }
 }
