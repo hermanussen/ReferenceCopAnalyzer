@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -57,7 +58,7 @@ namespace ReferenceCopAnalyzer.Test.Verifiers
                             solution = solution.AddAdditionalDocument(
                                 DocumentId.CreateNewId(projectId),
                                 additionalFile,
-                                SourceText.From(additionalFiles[additionalFile]));
+                                SourceText.From(additionalFiles[additionalFile], Encoding.UTF8));
                         }
                     }
 
