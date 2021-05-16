@@ -155,9 +155,24 @@ If you really want to keep things clean, just set IDE0005 severity to 'error'. Y
 dotnet_diagnostic.IDE0005.severity = error
 ```
 
-## Use the same rules for all projects
+## Use the same rules for all projects in a solution
 
-`TODO`
+It's much easier to manage rules for a whole solution than it is to manage rules for individual projects. But you do have to include the `.refrules` file in all the individual projects.
+
+The easiest way to do this:
+1. Right-click the root item in the solution explorer in Visual Studio and select "Manage NuGet Packages for Solution..."
+2. Find the `ReferenceCopAnalyzer` package
+3. In the right pane, select all projects and click "Install"
+4. Locate the solution folder on the filesystem and create a folder with the name `rules`
+5. Add a `.refrules` file to the folder (initially, the content of the file could just be `* *`)
+6. Add the following to every `.csproj` file in the solution:
+``` xml
+<ItemGroup>
+  <AdditionalFiles Include="$(SolutionDir)\rules\.refrules" />
+</ItemGroup>
+```
+
+If it fits your solution, you could use [Directory.Build.props](https://docs.microsoft.com/en-us/visualstudio/msbuild/customize-your-build) instead. It's a bit trickier to setup initially, but should be easier to maintain if/when new projects are added to your solution.
 
 ## Add exra reviewers in pull requests if rules are updated
 
