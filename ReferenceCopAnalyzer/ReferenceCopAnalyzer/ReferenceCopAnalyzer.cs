@@ -8,7 +8,6 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading;
 
 namespace ReferenceCopAnalyzer
 {
@@ -27,11 +26,11 @@ namespace ReferenceCopAnalyzer
 
         private static readonly string[] CommentIndicators = new[] { "#", "//" };
 
-        private static readonly Regex NamedWildcardRegex = new (@"\[[^]]+\]|\*", RegexOptions.Compiled);
+        private static readonly Regex NamedWildcardRegex = new(@"\[[^]]+\]|\*", RegexOptions.Compiled);
 
 #pragma warning disable RS2008 // Analyzer release tracking is not needed
 
-        private static readonly DiagnosticDescriptor ReferenceNotAllowedDiagnostic = new (
+        private static readonly DiagnosticDescriptor ReferenceNotAllowedDiagnostic = new(
             ReferenceNotAllowedDiagnosticId,
             "Reference is not allowed",
             "A reference between '{0}' and '{1}' is not allowed according to the rules file",
@@ -72,7 +71,7 @@ namespace ReferenceCopAnalyzer
             context.EnableConcurrentExecution();
             context.RegisterCompilationStartAction(compilationStartContext =>
             {
-                var rulesFiles = compilationStartContext
+                List<AdditionalText> rulesFiles = compilationStartContext
                     .Options
                     .AdditionalFiles
                     .Where(f => RulesFileName.Equals(Path.GetFileName(f.Path), StringComparison.InvariantCultureIgnoreCase))
@@ -81,7 +80,7 @@ namespace ReferenceCopAnalyzer
                 {
                     compilationStartContext.RegisterCompilationEndAction(compilationEndContext =>
                     {
-                        var diagnostic = Diagnostic.Create(NoRulesFileFoundDiagnostic, null);
+                        Diagnostic diagnostic = Diagnostic.Create(NoRulesFileFoundDiagnostic, null);
                         compilationEndContext.ReportDiagnostic(diagnostic);
                     });
 
@@ -92,19 +91,19 @@ namespace ReferenceCopAnalyzer
                 {
                     compilationStartContext.RegisterCompilationEndAction(compilationEndContext =>
                     {
-                        var diagnostic = Diagnostic.Create(MultipleRulesFilesFoundDiagnostic, null);
+                        Diagnostic diagnostic = Diagnostic.Create(MultipleRulesFilesFoundDiagnostic, null);
                         compilationEndContext.ReportDiagnostic(diagnostic);
                     });
-                    
+
                     return;
                 }
 
-                List<KeyValuePair<string,string>> allowedReferences = new ();
-                foreach (var line in rulesFiles
+                List<KeyValuePair<string, string>> allowedReferences = new();
+                foreach (string line in rulesFiles
                     .First()
                     .GetText()
                     .ToString()
-                    .Split(new [] { Environment.NewLine, "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                    .Split(new[] { Environment.NewLine, "\n" }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(l => l.ToString().Trim())
                     .Where(l =>
                         !string.IsNullOrWhiteSpace(l)
@@ -113,15 +112,15 @@ namespace ReferenceCopAnalyzer
                     string lineText = line;
                     foreach (string indicator in CommentIndicators.Where(i => lineText.Contains(i)))
                     {
-                        var indexOf = lineText.IndexOf(indicator, StringComparison.InvariantCultureIgnoreCase);
+                        int indexOf = lineText.IndexOf(indicator, StringComparison.InvariantCultureIgnoreCase);
                         if (indexOf >= 0)
                         {
                             lineText = lineText.Substring(0, indexOf);
                         }
                     }
 
-                    var sourceAndTarget = lineText
-                        .Split(new [] { RuleSeparator }, StringSplitOptions.RemoveEmptyEntries)
+                    string[] sourceAndTarget = lineText
+                        .Split(new string[] { RuleSeparator }, StringSplitOptions.RemoveEmptyEntries)
                         .Select(s => s.Trim())
                         .ToArray();
                     if (sourceAndTarget.Length != 2)
@@ -134,9 +133,9 @@ namespace ReferenceCopAnalyzer
 
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
                     {
-                        var u = (UsingDirectiveSyntax) modelContext.Node;
-                        
-                        var targetName = u.Name.ToFullString().Trim();
+                        UsingDirectiveSyntax u = modelContext.Node as UsingDirectiveSyntax;
+
+                        string targetName = u.Name.ToFullString().Trim();
 
                         bool stripClass = false;
 
@@ -148,7 +147,7 @@ namespace ReferenceCopAnalyzer
                         else if (u.ChildNodes().OfType<NameEqualsSyntax>().Any())
                         {
                             // If the alias references a class, that needs to be stripped
-                            var type = modelContext.SemanticModel
+                            ITypeSymbol type = modelContext.SemanticModel
                                 .GetTypeInfo(u.ChildNodes().OfType<QualifiedNameSyntax>().First())
                                 .Type;
                             if (type != null)
@@ -162,18 +161,19 @@ namespace ReferenceCopAnalyzer
                             targetName = u.ChildNodes().OfType<QualifiedNameSyntax>().FirstOrDefault()?.Left.ToFullString().Trim();
                         }
 
-                        var sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
+                        string sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
 
                         if (sourceName == null)
                         {
                             // If the code is not in a namespace, it applies to all namespaces in the compilation unit
-                            var namespaces = u.Parent.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
-                            foreach (var ns in namespaces)
+                            IEnumerable<NamespaceDeclarationSyntax> namespaces
+                                = u.Parent.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
+                            foreach (NamespaceDeclarationSyntax ns in namespaces)
                             {
                                 sourceName = ns.Name.ToFullString().Trim();
                                 if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                                 {
-                                    var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+                                    Diagnostic diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
                                     modelContext.ReportDiagnostic(diagnostic);
                                 }
@@ -181,10 +181,10 @@ namespace ReferenceCopAnalyzer
 
                             return;
                         }
-                        
+
                         if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                         {
-                            var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+                            Diagnostic diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
                             modelContext.ReportDiagnostic(diagnostic);
                         }
@@ -192,7 +192,7 @@ namespace ReferenceCopAnalyzer
 
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
                 {
-                    var u = (QualifiedNameSyntax) modelContext.Node;
+                    QualifiedNameSyntax u = modelContext.Node as QualifiedNameSyntax;
 
                     switch (u.Parent?.Kind())
                     {
@@ -204,10 +204,10 @@ namespace ReferenceCopAnalyzer
                         case SyntaxKind.UsingDirective:
                             return;
                     }
-                    
+
                     string targetName = null;
-                    var symbol = modelContext.SemanticModel.GetTypeInfo(u).Type
-                        ?? modelContext.SemanticModel.GetSymbolInfo(u).Symbol;
+                    ISymbol? symbol = modelContext.SemanticModel.GetTypeInfo(u).Type
+                                      ?? modelContext.SemanticModel.GetSymbolInfo(u).Symbol;
 
                     switch (symbol.Kind)
                     {
@@ -220,18 +220,18 @@ namespace ReferenceCopAnalyzer
                         default:
                             return;
                     }
-                    
-                    var containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+
+                    NamespaceDeclarationSyntax? containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
                     if (containingNamespace == null)
                     {
                         return;
                     }
 
-                    var sourceName = containingNamespace.Name.ToFullString().Trim();
+                    string sourceName = containingNamespace.Name.ToFullString().Trim();
 
                     if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                     {
-                        var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+                        Diagnostic diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
                         modelContext.ReportDiagnostic(diagnostic);
                     }
@@ -239,23 +239,23 @@ namespace ReferenceCopAnalyzer
 
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
                 {
-                    var u = (InvocationExpressionSyntax)modelContext.Node;
+                    InvocationExpressionSyntax u = (InvocationExpressionSyntax)modelContext.Node;
 
-                    var idNames = u.ChildNodes().OfType<IdentifierNameSyntax>().ToList();
+                    List<IdentifierNameSyntax> idNames = u.ChildNodes().OfType<IdentifierNameSyntax>().ToList();
                     if (!idNames.Any()
                         || idNames.All(n => n.Identifier.ValueText != "nameof"))
                     {
                         return;
                     }
 
-                    foreach (var expression in u
+                    foreach (ExpressionSyntax expression in u
                         .ChildNodes()
                         .OfType<ArgumentListSyntax>()
                         .SelectMany(a => a.Arguments.Select(b => b.Expression)))
                     {
                         string targetName = null;
-                        var symbol = modelContext.SemanticModel.GetTypeInfo(expression).Type
-                                     ?? modelContext.SemanticModel.GetSymbolInfo(expression).Symbol;
+                        ISymbol symbol = modelContext.SemanticModel.GetTypeInfo(expression).Type
+                                          ?? modelContext.SemanticModel.GetSymbolInfo(expression).Symbol;
                         if (symbol == null)
                         {
                             return;
@@ -266,24 +266,24 @@ namespace ReferenceCopAnalyzer
                             case SymbolKind.NamedType:
                                 targetName = symbol.ContainingNamespace.ToDisplayString();
                                 break;
-                            case SymbolKind.Namespace when ! ((symbol as INamespaceSymbol)?.IsGlobalNamespace ?? false):
+                            case SymbolKind.Namespace when !((symbol as INamespaceSymbol)?.IsGlobalNamespace ?? false):
                                 targetName = symbol.ToDisplayString();
                                 break;
                             default:
                                 return;
                         }
-                        
-                        var containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+
+                        NamespaceDeclarationSyntax? containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
                         if (containingNamespace == null)
                         {
                             return;
                         }
 
-                        var sourceName = containingNamespace.Name.ToFullString().Trim();
+                        string sourceName = containingNamespace.Name.ToFullString().Trim();
 
                         if (!IsAllowedReference(allowedReferences, sourceName, targetName))
                         {
-                            var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+                            Diagnostic diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
 
                             modelContext.ReportDiagnostic(diagnostic);
                         }
@@ -314,15 +314,15 @@ namespace ReferenceCopAnalyzer
 
             return allowedReferences.Any(r =>
                 {
-                    var ruleSource = r.Key;
-                    var ruleTarget = r.Value;
+                    string ruleSource = r.Key;
+                    string ruleTarget = r.Value;
 
                     // Keep a list of all named wildcard names
                     List<string> replaced = new();
 
                     // Keep names to actual values mappings, e.g.: [main_ns] = MyNs
                     List<KeyValuePair<string, string>> mappings = new();
-                    
+
                     // Replace named wildcards with actual wildcards, and store the names
                     foreach (Match match in NamedWildcardRegex.Matches(ruleSource))
                     {
@@ -349,7 +349,7 @@ namespace ReferenceCopAnalyzer
                                 continue;
                             }
 
-                            var rp = replaced.Skip(mappings.Count).FirstOrDefault();
+                            string rp = replaced.Skip(mappings.Count).FirstOrDefault();
                             if (rp != null)
                             {
                                 mappings.Add(new KeyValuePair<string, string>(rp, matchGroup.Value));
@@ -358,7 +358,7 @@ namespace ReferenceCopAnalyzer
                     }
 
                     // Replace the named wildcards in the target rule with the actual values from the source
-                    foreach (var mapping in mappings.Where(m => m.Key != "*"))
+                    foreach (KeyValuePair<string, string> mapping in mappings.Where(m => m.Key != "*"))
                     {
                         ruleTarget = ruleTarget.Replace(mapping.Key, mapping.Value);
                     }
@@ -369,12 +369,8 @@ namespace ReferenceCopAnalyzer
 
         private static bool IsMatch(string pattern, string reference)
         {
-            if (pattern == reference)
-            {
-                return true;
-            }
-            
-            return Regex.IsMatch(reference, WildCardToRegular(pattern));
+            return pattern == reference
+                   || Regex.IsMatch(reference, WildCardToRegular(pattern));
         }
 
         private static string WildCardToRegular(string value)

@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Testing;
+using ReferenceCopAnalyzer.Test.Verifiers;
 using Xunit;
-using VerifyCS = ReferenceCopAnalyzer.Test.Verifiers.CSharpAnalyzerVerifier<ReferenceCopAnalyzer.ReferenceCopAnalyzer>;
 
 namespace ReferenceCopAnalyzer.Test
 {
@@ -156,9 +156,9 @@ Two One", 3, 6, 3, 14, new[] { "One", "Two" })]
             int endColumn,
             object[] arguments)
         {
-            await VerifyCS.VerifyReferenceCopAnalysis(source, rules, new[]
+            await ReferenceCopAnalyzerVerifier.VerifyReferenceCopAnalysis(source, rules, new[]
                 {
-                    VerifyCS
+                    ReferenceCopAnalyzerVerifier
                         .Diagnostic(ReferenceCopAnalyzer.ReferenceNotAllowedDiagnosticId)
                         .WithSpan(startLine, startColumn, endLine, endColumn)
                         .WithArguments(arguments)
@@ -179,7 +179,7 @@ One Two")]
         [InlineData(GenericTypeArg, "One Two")]
         public async Task ShouldNotReportIllegalReference(string source, string rules)
         {
-            await VerifyCS.VerifyReferenceCopAnalysis(source, rules, Array.Empty<DiagnosticResult>());
+            await ReferenceCopAnalyzerVerifier.VerifyReferenceCopAnalysis(source, rules, Array.Empty<DiagnosticResult>());
         }
     }
 }
