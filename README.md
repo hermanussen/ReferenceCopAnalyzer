@@ -64,6 +64,25 @@ If you also want to allow references to namespaces like `System.Text.Json` or `S
 * System.*
 ```
 
+## Make an exception
+
+You can use `!` to make a rule that disallows a reference.
+```
+# Allow any class in any namespace to reference System or any deeper namespace
+* System
+* System.*
+
+# But don't allow references to System.IO or anything deeper
+!* System.IO
+!* System.IO.*
+```
+
+Rules are processed in order, so the last rule that matches a reference determines if the reference is allowed. So, for example, if you would amend the previous example with...
+```
+* System.*
+```
+... then references to `System.IO` would still be allowed.
+
 ## Allow references from your controllers to your services
 
 Given a setup where you have a namespace `MyProject.Controllers` and a namespace `MyProject.Services`, you may want to ensure that controllers can reference services (and not the other way around).

@@ -22,7 +22,7 @@
     <DebugSymbols>true</DebugSymbols>
     <PackageScribanIncludeSource>true</PackageScribanIncludeSource>
     <LangVersion>9.0</LangVersion>
-    <Version>0.1.8</Version>
+    <Version>0.2.0</Version>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 

@@ -328,59 +328,77 @@ namespace ReferenceCopAnalyzer
                 return true;
             }
 
-            return allowedReferences.Any(r =>
+            bool allowed = false;
+
+            foreach (KeyValuePair<string, string> allowedReference in allowedReferences)
+            {
+                bool isNegated = false;
+                string ruleSource = allowedReference.Key.Trim();
+                string ruleTarget = allowedReference.Value.Trim();
+
+                if (ruleSource.StartsWith("!"))
                 {
-                    string ruleSource = r.Key;
-                    string ruleTarget = r.Value;
+                    isNegated = true;
+                    ruleSource = ruleSource.Substring(1).Trim();
+                }
 
-                    // Keep a list of all named wildcard names
-                    List<string> replaced = new();
+                // Keep a list of all named wildcard names
+                List<string> replaced = new();
 
-                    // Keep names to actual values mappings, e.g.: [main_ns] = MyNs
-                    List<KeyValuePair<string, string>> mappings = new();
+                // Keep names to actual values mappings, e.g.: [main_ns] = MyNs
+                List<KeyValuePair<string, string>> mappings = new();
 
-                    // Replace named wildcards with actual wildcards, and store the names
-                    foreach (Match match in NamedWildcardRegex.Matches(ruleSource))
+                // Replace named wildcards with actual wildcards, and store the names
+                foreach (Match match in NamedWildcardRegex.Matches(ruleSource))
+                {
+                    ruleSource = ruleSource.Replace(match.Value, "*");
+                    replaced.Add(match.Value);
+                }
+
+                // If the source rule is not a match, we can skip further processing
+                if (!IsMatch(ruleSource, sourceName))
+                {
+                    continue;
+                }
+
+                // Build the mappings based on the sourceName
+                foreach (Match match in Regex.Matches(sourceName, WildCardToRegular(ruleSource)))
+                {
+                    bool first = true;
+                    foreach (Group matchGroup in match.Groups)
                     {
-                        ruleSource = ruleSource.Replace(match.Value, "*");
-                        replaced.Add(match.Value);
-                    }
-
-                    // If the source rule is not a match, we can skip further processing
-                    if (!IsMatch(ruleSource, sourceName))
-                    {
-                        return false;
-                    }
-
-                    // Build the mappings based on the sourceName
-                    foreach (Match match in Regex.Matches(sourceName, WildCardToRegular(ruleSource)))
-                    {
-                        bool first = true;
-                        foreach (Group matchGroup in match.Groups)
+                        if (first)
                         {
-                            if (first)
-                            {
-                                // Skip the first match group, as it contains the whole thing
-                                first = false;
-                                continue;
-                            }
+                            // Skip the first match group, as it contains the whole thing
+                            first = false;
+                            continue;
+                        }
 
-                            string rp = replaced.Skip(mappings.Count).FirstOrDefault();
-                            if (rp != null)
-                            {
-                                mappings.Add(new KeyValuePair<string, string>(rp, matchGroup.Value));
-                            }
+                        string rp = replaced.Skip(mappings.Count).FirstOrDefault();
+                        if (rp != null)
+                        {
+                            mappings.Add(new KeyValuePair<string, string>(rp, matchGroup.Value));
                         }
                     }
+                }
 
-                    // Replace the named wildcards in the target rule with the actual values from the source
-                    foreach (KeyValuePair<string, string> mapping in mappings.Where(m => m.Key != "*"))
-                    {
-                        ruleTarget = ruleTarget.Replace(mapping.Key, mapping.Value);
-                    }
+                // Replace the named wildcards in the target rule with the actual values from the source
+                foreach (KeyValuePair<string, string> mapping in mappings.Where(m => m.Key != "*"))
+                {
+                    ruleTarget = ruleTarget.Replace(mapping.Key, mapping.Value);
+                }
 
-                    return IsMatch(ruleTarget, targetName);
-                });
+                bool isMatch = IsMatch(ruleTarget, targetName);
+
+                if (!isMatch)
+                {
+                    continue;
+                }
+
+                allowed = !isNegated;
+            }
+
+            return allowed;
         }
 
         private static bool IsMatch(string pattern, string reference)
