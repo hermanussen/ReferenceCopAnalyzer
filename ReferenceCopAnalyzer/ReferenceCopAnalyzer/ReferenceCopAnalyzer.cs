@@ -208,12 +208,18 @@ namespace ReferenceCopAnalyzer
                     string targetName = null;
                     var symbol = modelContext.SemanticModel.GetTypeInfo(u).Type
                         ?? modelContext.SemanticModel.GetSymbolInfo(u).Symbol;
-                    if (symbol == null)
-                    {
-                        return;
-                    }
 
-                    targetName = symbol.ContainingNamespace.ToDisplayString();
+                    switch (symbol.Kind)
+                    {
+                        case SymbolKind.NamedType:
+                            targetName = symbol.ContainingNamespace.ToDisplayString();
+                            break;
+                        case SymbolKind.Namespace when !((symbol as INamespaceSymbol)?.IsGlobalNamespace ?? false):
+                            targetName = symbol.ToDisplayString();
+                            break;
+                        default:
+                            return;
+                    }
                     
                     var containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
                     if (containingNamespace == null)
@@ -230,6 +236,59 @@ namespace ReferenceCopAnalyzer
                         modelContext.ReportDiagnostic(diagnostic);
                     }
                 }, SyntaxKind.QualifiedName);
+
+                compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
+                {
+                    var u = (InvocationExpressionSyntax)modelContext.Node;
+
+                    var idNames = u.ChildNodes().OfType<IdentifierNameSyntax>().ToList();
+                    if (!idNames.Any()
+                        || idNames.All(n => n.Identifier.ValueText != "nameof"))
+                    {
+                        return;
+                    }
+
+                    foreach (var expression in u
+                        .ChildNodes()
+                        .OfType<ArgumentListSyntax>()
+                        .SelectMany(a => a.Arguments.Select(b => b.Expression)))
+                    {
+                        string targetName = null;
+                        var symbol = modelContext.SemanticModel.GetTypeInfo(expression).Type
+                                     ?? modelContext.SemanticModel.GetSymbolInfo(expression).Symbol;
+                        if (symbol == null)
+                        {
+                            return;
+                        }
+
+                        switch (symbol.Kind)
+                        {
+                            case SymbolKind.NamedType:
+                                targetName = symbol.ContainingNamespace.ToDisplayString();
+                                break;
+                            case SymbolKind.Namespace when ! ((symbol as INamespaceSymbol)?.IsGlobalNamespace ?? false):
+                                targetName = symbol.ToDisplayString();
+                                break;
+                            default:
+                                return;
+                        }
+                        
+                        var containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+                        if (containingNamespace == null)
+                        {
+                            return;
+                        }
+
+                        var sourceName = containingNamespace.Name.ToFullString().Trim();
+
+                        if (!IsAllowedReference(allowedReferences, sourceName, targetName))
+                        {
+                            var diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+
+                            modelContext.ReportDiagnostic(diagnostic);
+                        }
+                    }
+                }, SyntaxKind.InvocationExpression);
             });
         }
 
