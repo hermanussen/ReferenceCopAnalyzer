@@ -47,19 +47,35 @@ namespace ReferenceCopAnalyzer.Test.Verifiers
             {
                 SolutionTransforms.Add((solution, projectId) =>
                 {
-                    CompilationOptions? compilationOptions = solution.GetProject(projectId).CompilationOptions;
+                    CompilationOptions? compilationOptions = solution.GetProject(projectId)?.CompilationOptions;
+                    if (compilationOptions == null)
+                    {
+                        return solution;
+                    }
+
                     compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
                         compilationOptions.SpecificDiagnosticOptions.SetItems(CSharpVerifierHelper.NullableWarnings));
                     solution = solution.WithProjectCompilationOptions(projectId, compilationOptions);
 
-                    if (additionalFiles?.Count > 0)
+                    if (additionalFiles.Count > 0)
                     {
                         foreach (string? additionalFile in additionalFiles.AllKeys)
                         {
+                            if (additionalFile == null)
+                            {
+                                continue;
+                            }
+
+                            string? fileContents = additionalFiles[additionalFile];
+                            if (fileContents == null)
+                            {
+                                continue;
+                            }
+
                             solution = solution.AddAdditionalDocument(
                                 DocumentId.CreateNewId(projectId),
                                 additionalFile,
-                                SourceText.From(additionalFiles[additionalFile], Encoding.UTF8));
+                                SourceText.From(fileContents, Encoding.UTF8));
                         }
                     }
 

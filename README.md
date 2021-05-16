@@ -124,9 +124,9 @@ If you are familiar with [Sitecore Helix](https://helix.sitecore.com/principles/
 
 # Miscellaneous
 
-## Using statements that are not needed
+## Using directives that are not needed
 
-You may run into "false positives" for using statements that are not actually used. ReferenceCopAnalyzer will still report them, if they violate the rules.
+You may run into "false positives" for "using" directives that are not actually used. ReferenceCopAnalyzer will still report them, if they violate the rules.
 
 But since they aren't needed anyway, why not just remove them? And [IDE0005](https://docs.microsoft.com/en-us/dotnet/fundamentals/code-analysis/style-rules/ide0005) reports them (this analyzer comes with .NET 5+ by default, or can be [installed separately if needed](https://docs.microsoft.com/en-us/dotnet/fundamentals/code-analysis/overview)).
 

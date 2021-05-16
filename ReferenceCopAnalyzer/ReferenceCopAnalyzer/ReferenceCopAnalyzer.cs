@@ -8,6 +8,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis.Text;
 
 namespace ReferenceCopAnalyzer
 {
@@ -76,16 +77,6 @@ namespace ReferenceCopAnalyzer
                     .AdditionalFiles
                     .Where(f => RulesFileName.Equals(Path.GetFileName(f.Path), StringComparison.InvariantCultureIgnoreCase))
                     .ToList();
-                if (!rulesFiles.Any())
-                {
-                    compilationStartContext.RegisterCompilationEndAction(compilationEndContext =>
-                    {
-                        Diagnostic diagnostic = Diagnostic.Create(NoRulesFileFoundDiagnostic, null);
-                        compilationEndContext.ReportDiagnostic(diagnostic);
-                    });
-
-                    return;
-                }
 
                 if (rulesFiles.Count > 1)
                 {
@@ -98,10 +89,20 @@ namespace ReferenceCopAnalyzer
                     return;
                 }
 
+                SourceText? rulesFile = rulesFiles.FirstOrDefault()?.GetText();
+                if (rulesFile == null)
+                {
+                    compilationStartContext.RegisterCompilationEndAction(compilationEndContext =>
+                    {
+                        Diagnostic diagnostic = Diagnostic.Create(NoRulesFileFoundDiagnostic, null);
+                        compilationEndContext.ReportDiagnostic(diagnostic);
+                    });
+
+                    return;
+                }
+
                 List<KeyValuePair<string, string>> allowedReferences = new();
-                foreach (string line in rulesFiles
-                    .First()
-                    .GetText()
+                foreach (string line in rulesFile
                     .ToString()
                     .Split(new[] { Environment.NewLine, "\n" }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(l => l.ToString().Trim())
@@ -133,7 +134,10 @@ namespace ReferenceCopAnalyzer
 
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
                     {
-                        UsingDirectiveSyntax u = modelContext.Node as UsingDirectiveSyntax;
+                        if (modelContext.Node is not UsingDirectiveSyntax u)
+                        {
+                            return;
+                        }
 
                         string targetName = u.Name.ToFullString().Trim();
 
@@ -147,10 +151,10 @@ namespace ReferenceCopAnalyzer
                         else if (u.ChildNodes().OfType<NameEqualsSyntax>().Any())
                         {
                             // If the alias references a class, that needs to be stripped
-                            ITypeSymbol type = modelContext.SemanticModel
+                            if (modelContext
+                                .SemanticModel
                                 .GetTypeInfo(u.ChildNodes().OfType<QualifiedNameSyntax>().First())
-                                .Type;
-                            if (type != null)
+                                .Type != null)
                             {
                                 stripClass = true;
                             }
@@ -158,24 +162,29 @@ namespace ReferenceCopAnalyzer
 
                         if (stripClass)
                         {
-                            targetName = u.ChildNodes().OfType<QualifiedNameSyntax>().FirstOrDefault()?.Left.ToFullString().Trim();
+                            targetName = u.ChildNodes().OfType<QualifiedNameSyntax>().FirstOrDefault()?.Left.ToFullString().Trim()
+                                ?? targetName;
                         }
 
-                        string sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
+                        string? sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
 
                         if (sourceName == null)
                         {
                             // If the code is not in a namespace, it applies to all namespaces in the compilation unit
-                            IEnumerable<NamespaceDeclarationSyntax> namespaces
-                                = u.Parent.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
-                            foreach (NamespaceDeclarationSyntax ns in namespaces)
+                            IEnumerable<NamespaceDeclarationSyntax>? namespaces
+                                = u.Parent?.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
+                            if (namespaces != null)
                             {
-                                sourceName = ns.Name.ToFullString().Trim();
-                                if (!IsAllowedReference(allowedReferences, sourceName, targetName))
+                                foreach (NamespaceDeclarationSyntax ns in namespaces)
                                 {
-                                    Diagnostic diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic, u.GetLocation(), sourceName, targetName);
+                                    sourceName = ns.Name.ToFullString().Trim();
+                                    if (!IsAllowedReference(allowedReferences, sourceName, targetName))
+                                    {
+                                        Diagnostic diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic,
+                                            u.GetLocation(), sourceName, targetName);
 
-                                    modelContext.ReportDiagnostic(diagnostic);
+                                        modelContext.ReportDiagnostic(diagnostic);
+                                    }
                                 }
                             }
 
@@ -192,7 +201,10 @@ namespace ReferenceCopAnalyzer
 
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
                 {
-                    QualifiedNameSyntax u = modelContext.Node as QualifiedNameSyntax;
+                    if (modelContext.Node is not QualifiedNameSyntax u)
+                    {
+                        return;
+                    }
 
                     switch (u.Parent?.Kind())
                     {
@@ -205,9 +217,13 @@ namespace ReferenceCopAnalyzer
                             return;
                     }
 
-                    string targetName = null;
+                    string? targetName;
                     ISymbol? symbol = modelContext.SemanticModel.GetTypeInfo(u).Type
                                       ?? modelContext.SemanticModel.GetSymbolInfo(u).Symbol;
+                    if (symbol == null)
+                    {
+                        return;
+                    }
 
                     switch (symbol.Kind)
                     {
@@ -253,8 +269,8 @@ namespace ReferenceCopAnalyzer
                         .OfType<ArgumentListSyntax>()
                         .SelectMany(a => a.Arguments.Select(b => b.Expression)))
                     {
-                        string targetName = null;
-                        ISymbol symbol = modelContext.SemanticModel.GetTypeInfo(expression).Type
+                        string targetName;
+                        ISymbol? symbol = modelContext.SemanticModel.GetTypeInfo(expression).Type
                                           ?? modelContext.SemanticModel.GetSymbolInfo(expression).Symbol;
                         if (symbol == null)
                         {

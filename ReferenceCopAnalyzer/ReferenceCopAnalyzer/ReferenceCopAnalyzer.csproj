@@ -23,6 +23,7 @@
     <PackageScribanIncludeSource>true</PackageScribanIncludeSource>
     <LangVersion>9.0</LangVersion>
     <Version>0.1.8</Version>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
