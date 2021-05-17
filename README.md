@@ -4,6 +4,17 @@
 
 Analyzer that checks references from code to different namespaces in .NET, based on your own rules
 
+```
+┌───┐   ┌─┐                ┌───┐      
+│┌─┐│   │┌┘                │┌─┐████   
+│└─┘├──┬┘└┬──┬─┬──┬─┐┌──┬──┤│░└█══█──┐
+│┌┐┌┤│─┼┐┌┤│─┤┌┤│─┤┌┐┤┌─┤│─┤│░┌█══█┌┐│
+│││└┤│─┤││││─┤│││─┤│││└─┤│─┤└─┘█══█└┘│
+└┘└─┴──┘└┘└──┴┘└──┴┘└┴──┴──┴───█══█┌─┘
+                                ██││  
+                                  └┘  
+```
+
 # About
 
 If you are working on a code base with multiple developers and you have some ideas about how dependencies must flow, it is a good idea to translate those ideas to a set of rules. But checking those rules manually when changes are made can be cumbersome and error-prone.
