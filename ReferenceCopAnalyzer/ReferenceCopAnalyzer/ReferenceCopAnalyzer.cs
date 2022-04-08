@@ -353,7 +353,7 @@ namespace ReferenceCopAnalyzer
                 // Keep names to actual values mappings, e.g.: [main_ns] = MyNs
                 List<KeyValuePair<string, string>> mappings = new();
 
-                var matches = Regex.Matches(sourceName, allowedReference.RuleSourceRegex, RegexOptions.Compiled);
+                var matches = Regex.Matches(sourceName, allowedReference.RuleSourceRegex);
 
                 // If the source rule is not a match, we can skip further processing
                 if (matches.Count == 0)
