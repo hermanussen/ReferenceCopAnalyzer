@@ -1,0 +1,88 @@
+# Allow any reference to and from anywhere by default. Rules are processed in order, so the last rule that matches a reference determines if the reference is allowed.
+* *
+
+# Every component may reference contracts
+# Dg.* Dg.*.Contracts
+
+# Contracts should not reference Dg stuff
+!Dg.*.Contracts* Dg.*
+# ...except own contracts and ReferenceData
+Dg.[context].Contracts* Dg.[context].Contracts*
+Dg.*.Contracts* Dg.ReferenceData*
+Dg.*.Contracts* Dg.ReferenceData*
+
+# Do not reference internal apis
+!Dg.* Dg.*.Internal
+# ..except within your own context
+Dg.[context] Dg.[context].Internal
+Dg.[context] Dg.[context].*.Internal
+Dg.[context].* Dg.[context].Internal
+Dg.[context].* Dg.[context].*.Internal
+Dg.[context].*.* Dg.[context].*.Internal
+Dg.[context].*.*.* Dg.[context].*.Internal
+Dg.[context].*.*.*.* Dg.[context].*.Internal
+
+# Dg should not reference devinite
+!Dg.* devinite.*
+# ...except Dg monolith may reference devinite
+Dg.*.Monolith* devinite.*
+
+# CLEAN THIS UP - Exceptions to make devinite build initially
+Dg.*.Contracts Dg.Utils
+# Money and VatMoney
+Dg.*.Contracts* Dg.Finance*
+# PDF generation
+Dg.*.Contracts* Dg.SpeeDyF.Framework.Abstractions*
+Dg.ProductList.Contracts Dg.ShopProductCatalog.ServiceClient*
+Dg.ProductList.Contracts Dg.Finance
+Dg.ProductList.Contracts Dg.Finance.Contracts
+Dg.Logistics.ProductStock.Contracts Dg.Logistics.Monolith.Contracts
+
+# Exceptions for project Dg.Finance.IdExtensions
+Dg.Finance devinite.DbLayer
+
+# Exceptions for project Dg.Personalization
+Dg.Personalization.Recommender devinite.DbLayer
+Dg.Personalization.Recommender.ProductsFromBrandsILike devinite.DbLayer
+
+# Exceptions for project Dg.Wms.DataAccess
+Dg.Wms.DataAccess.AggregateUpdate devinite.DbLayer
+Dg.Wms.DataAccess.DbEntityIds devinite.DbLayer
+
+# Exceptions for project Dg.LogisticsProductCatalog
+Dg.LogisticsProductCatalog devinite.DbLayer
+
+# Exceptions for project Dg.Messaging.Monolith.Framework
+Dg.Messaging.Framework devinite.DbEntityIds
+Dg.Messaging.Framework devinite.DbLayer
+
+# Our Component needs access to BlobStorage Mocks
+Dg.ProviderOrderInterface.Tests.* devinite.Testing.Integration.InversionOfControl
+
+# Some more exceptions after refinement of the rules 22.3.2022
+Dg.CategoryManagement.Contracts.ProductData.PowerAdapter Dg.CategoryManagement.ProductData.PowerAdapter
+Dg.CategoryManagement.Contracts.ProductData.PowerConnection Dg.CategoryManagement.Monolith.Contracts.ProductData.PowerConnection
+Dg.CategoryManagement.Contracts.Provider.DeliveryInformation Dg.CategoryManagement.Provider.Contracts
+Dg.CategoryManagement.Contracts.PurchaseOffer.SupplierConfigurations.Publishing Dg.CategoryManagement.PurchaseOffer
+Dg.CategoryManagement.Contracts.PurchaseOffer.SupplierOfferOverride.Publishing Dg.CategoryManagement.PurchaseOffer
+Dg.CategoryManagement.Contracts.PurchaseOrder.OrderBookManagement Dg.Finance
+Dg.CategoryManagement.Contracts.PurchaseOrder.OrderCreation Dg.CategoryManagement.PurchaseOrder
+Dg.CategoryManagement.Contracts.PurchaseOrder.OrderCreation Dg.CategoryManagement.PurchaseOrder.OrderCreation
+Dg.CategoryManagement.Contracts.RetailSalesPrice.BotPriceLimit Dg.CategoryManagement.RetailSalesPrice.BotPriceLimit
+Dg.CategoryManagement.Contracts.RetailSalesPrice.Pricing Dg.CategoryManagement.RetailSalesPrice.Pricing
+Dg.CategoryManagement.Contracts.SalesOffers Dg.Finance
+Dg.CategoryManagement.Contracts.SalesOrder.EuHub Dg.CategoryManagement.SalesOrder.EuHub
+Dg.CategoryManagement.Contracts.TargetAgreements.AchievedStep Dg.CategoryManagement.TargetAgreements
+Dg.CategoryManagement.Contracts.TargetAgreements.TargetAgreementSettlements Dg.CategoryManagement.TargetAgreements
+Dg.CategoryManagement.Contracts.TargetAgreements.TargetAgreementSettlements Dg.Finance
+Dg.CrossSelling.Contracts.Acl Dg.Finance
+Dg.Finance.Contracts.PriceCalculation Dg.OldDgPackage
+Dg.OrderingProcess.Contracts.ShoppingCart Dg.Finance
+Dg.OrderingProcess.Contracts.ShoppingCart Dg.ShopProductCatalog.ServiceClient
+Dg.OrderingProcess.Contracts.ShoppingCart Dg.ShopProductCatalog.ServiceClient.Models
+Dg.Receivables.Contracts.FinancialTransactionConnection Dg.Finance
+Dg.Resale.Contracts.Internal.Acl.Backend Dg.Minilith.AclFramework
+Dg.Resale.Contracts.Internal.Acl.PortalSystem Dg.Minilith.AclFramework
+
+# Exception for hotfix in PR 76631
+Dg.OrderingProcess.Contracts.ShoppingCart Dg.OrderingProcess.Acl

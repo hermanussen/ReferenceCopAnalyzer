@@ -101,7 +101,7 @@ namespace ReferenceCopAnalyzer
                     return;
                 }
 
-                List<KeyValuePair<string, string>> allowedReferences = new();
+                List<ReferenceRule> allowedReferences = new();
                 foreach (string line in rulesFile
                     .ToString()
                     .Split(new[] { Environment.NewLine, "\n" }, StringSplitOptions.RemoveEmptyEntries)
@@ -129,7 +129,25 @@ namespace ReferenceCopAnalyzer
                         continue;
                     }
 
-                    allowedReferences.Add(new KeyValuePair<string, string>(sourceAndTarget[0], sourceAndTarget[1]));
+                    var ruleSource = sourceAndTarget[0].Trim();
+                    bool isNegated = ruleSource.StartsWith("!");
+                    if (isNegated)
+                    {
+                        ruleSource = ruleSource.Substring(1).Trim();
+                    }
+                    var ruleTarget = sourceAndTarget[1].Trim();
+                    
+                    // Replace named wildcards with actual wildcards, and store the names
+                    List<string> replaced = new();
+                    foreach (Match match in NamedWildcardRegex.Matches(ruleSource))
+                    {
+                        ruleSource = ruleSource.Replace(match.Value, "*");
+                        replaced.Add(match.Value);
+                    }
+                    
+                    var ruleSourceRegex = WildCardToRegular(ruleSource);
+
+                    allowedReferences.Add(new ReferenceRule(isNegated, ruleSourceRegex, ruleTarget, replaced));
                 }
 
                 compilationStartContext.RegisterSyntaxNodeAction(modelContext =>
@@ -308,7 +326,7 @@ namespace ReferenceCopAnalyzer
             });
         }
 
-        private static bool IsAllowedReference(List<KeyValuePair<string, string>> allowedReferences, string sourceName, string targetName)
+        private static bool IsAllowedReference(IReadOnlyList<ReferenceRule> allowedReferences, string sourceName, string targetName)
         {
             const string global = "global::";
 
@@ -330,39 +348,21 @@ namespace ReferenceCopAnalyzer
 
             bool allowed = false;
 
-            foreach (KeyValuePair<string, string> allowedReference in allowedReferences)
+            foreach (var allowedReference in allowedReferences)
             {
-                bool isNegated = false;
-                string ruleSource = allowedReference.Key.Trim();
-                string ruleTarget = allowedReference.Value.Trim();
-
-                if (ruleSource.StartsWith("!"))
-                {
-                    isNegated = true;
-                    ruleSource = ruleSource.Substring(1).Trim();
-                }
-
-                // Keep a list of all named wildcard names
-                List<string> replaced = new();
-
                 // Keep names to actual values mappings, e.g.: [main_ns] = MyNs
                 List<KeyValuePair<string, string>> mappings = new();
 
-                // Replace named wildcards with actual wildcards, and store the names
-                foreach (Match match in NamedWildcardRegex.Matches(ruleSource))
-                {
-                    ruleSource = ruleSource.Replace(match.Value, "*");
-                    replaced.Add(match.Value);
-                }
+                var matches = Regex.Matches(sourceName, allowedReference.RuleSourceRegex);
 
                 // If the source rule is not a match, we can skip further processing
-                if (!IsMatch(ruleSource, sourceName))
+                if (matches.Count == 0)
                 {
                     continue;
                 }
 
                 // Build the mappings based on the sourceName
-                foreach (Match match in Regex.Matches(sourceName, WildCardToRegular(ruleSource)))
+                foreach (Match match in matches)
                 {
                     bool first = true;
                     foreach (Group matchGroup in match.Groups)
@@ -374,7 +374,7 @@ namespace ReferenceCopAnalyzer
                             continue;
                         }
 
-                        string rp = replaced.Skip(mappings.Count).FirstOrDefault();
+                        string rp = allowedReference.ReplacedSourcePatterns.Skip(mappings.Count).FirstOrDefault();
                         if (rp != null)
                         {
                             mappings.Add(new KeyValuePair<string, string>(rp, matchGroup.Value));
@@ -382,29 +382,30 @@ namespace ReferenceCopAnalyzer
                     }
                 }
 
+                var ruleTarget = allowedReference.RuleTarget;
                 // Replace the named wildcards in the target rule with the actual values from the source
                 foreach (KeyValuePair<string, string> mapping in mappings.Where(m => m.Key != "*"))
                 {
                     ruleTarget = ruleTarget.Replace(mapping.Key, mapping.Value);
                 }
 
-                bool isMatch = IsMatch(ruleTarget, targetName);
+                bool isMatch = IsMatch( WildCardToRegular(ruleTarget), targetName);
 
                 if (!isMatch)
                 {
                     continue;
                 }
 
-                allowed = !isNegated;
+                allowed = !allowedReference.IsNegated;
             }
 
             return allowed;
         }
 
-        private static bool IsMatch(string pattern, string reference)
+        private static bool IsMatch(string patternRegex, string reference)
         {
-            return pattern == reference
-                   || Regex.IsMatch(reference, WildCardToRegular(pattern));
+            return patternRegex == reference
+                   || Regex.IsMatch(reference, patternRegex);
         }
 
         private static string WildCardToRegular(string value)

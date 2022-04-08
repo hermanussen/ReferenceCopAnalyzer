@@ -1,4 +1,7 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Testing;
 using ReferenceCopAnalyzer.Test.Verifiers;
@@ -180,6 +183,29 @@ One Two")]
         public async Task ShouldNotReportIllegalReference(string source, string rules)
         {
             await ReferenceCopAnalyzerVerifier.VerifyReferenceCopAnalysis(source, rules, Array.Empty<DiagnosticResult>());
+        }
+        
+        [Fact]
+        public async Task RunAnalyzerOnLargeFileForPerformanceProfiling()
+        {
+            var source = ReadAllText(@"TestFiles\ActionLink.cs");
+            var rules = ReadAllText(@"TestFiles\.refrules");
+
+            for (int i = 0; i < 10; i++)
+            {
+                await ReferenceCopAnalyzerVerifier.VerifyReferenceCopAnalysis(source, rules,
+                    Array.Empty<DiagnosticResult>());
+            }
+        }
+
+        private static string ReadAllText(string relativePath)
+        {
+            var codeBaseUrl = new Uri(Assembly.GetExecutingAssembly().Location ?? throw new InvalidOperationException());
+            var codeBasePath = Uri.UnescapeDataString(codeBaseUrl.AbsolutePath);
+            string dirPath = Path.GetDirectoryName(codeBasePath) ?? throw new InvalidOperationException();
+            var solutionDir = DirectoryFinder.FindParentDirectoryWith(dirPath, "*.csproj");
+
+            return File.ReadAllText(Path.Combine(solutionDir, relativePath));
         }
     }
 }
