@@ -142,6 +142,7 @@ namespace ReferenceCopAnalyzer
                         string targetName = u.Name.ToFullString().Trim();
 
                         bool stripClass = false;
+                        bool isGlobal = u.GlobalKeyword.Text == "global";
 
                         // A static import has a reference to a class instead of a namespace, so that needs to be stripped
                         if (u.ChildTokens().Any(n => n.IsKind(SyntaxKind.StaticKeyword)))
@@ -166,16 +167,30 @@ namespace ReferenceCopAnalyzer
                                 ?? targetName;
                         }
 
-                        string? sourceName = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>()?.Name.ToFullString().Trim();
+                        string? sourceName = FindContainingNameSpace(u)?.Name.ToFullString().Trim();
+
+                        if (isGlobal)
+                        {
+                            sourceName = "*";
+                            if (!IsAllowedReference(allowedReferences, sourceName, targetName))
+                            {
+                                Diagnostic diagnostic = Diagnostic.Create(ReferenceNotAllowedDiagnostic,
+                                    u.GetLocation(), sourceName, targetName);
+
+                                modelContext.ReportDiagnostic(diagnostic);
+                            }
+
+                            return;
+                        }
 
                         if (sourceName == null)
                         {
                             // If the code is not in a namespace, it applies to all namespaces in the compilation unit
-                            IEnumerable<NamespaceDeclarationSyntax>? namespaces
-                                = u.Parent?.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
+                            IEnumerable<BaseNamespaceDeclarationSyntax>? namespaces
+                                = u.Parent?.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>();
                             if (namespaces != null)
                             {
-                                foreach (NamespaceDeclarationSyntax ns in namespaces)
+                                foreach (BaseNamespaceDeclarationSyntax ns in namespaces)
                                 {
                                     sourceName = ns.Name.ToFullString().Trim();
                                     if (!IsAllowedReference(allowedReferences, sourceName, targetName))
@@ -237,7 +252,7 @@ namespace ReferenceCopAnalyzer
                             return;
                     }
 
-                    NamespaceDeclarationSyntax? containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+                    BaseNamespaceDeclarationSyntax? containingNamespace = FindContainingNameSpace(u);
                     if (containingNamespace == null)
                     {
                         return;
@@ -289,7 +304,7 @@ namespace ReferenceCopAnalyzer
                                 return;
                         }
 
-                        NamespaceDeclarationSyntax? containingNamespace = u.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+                        BaseNamespaceDeclarationSyntax? containingNamespace = FindContainingNameSpace(u);
                         if (containingNamespace == null)
                         {
                             return;
@@ -306,6 +321,13 @@ namespace ReferenceCopAnalyzer
                     }
                 }, SyntaxKind.InvocationExpression);
             });
+        }
+
+        private static BaseNamespaceDeclarationSyntax? FindContainingNameSpace(CSharpSyntaxNode syntaxNode)
+        {
+            BaseNamespaceDeclarationSyntax? result = syntaxNode.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+            result ??= syntaxNode.FirstAncestorOrSelf<CompilationUnitSyntax>()?.ChildNodes().OfType<FileScopedNamespaceDeclarationSyntax>().FirstOrDefault();
+            return result;
         }
 
         private static bool IsAllowedReference(List<KeyValuePair<string, string>> allowedReferences, string sourceName, string targetName)

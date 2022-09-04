@@ -17,18 +17,33 @@ namespace ReferenceCopAnalyzer.Test.Verifiers
             return CSharpAnalyzerVerifier<ReferenceCopAnalyzer, MSTestVerifier>.Diagnostic(diagnosticId);
         }
 
-        public static async Task VerifyAnalyzerAsync(string source, NameValueCollection additionalFiles, DiagnosticResult[] expected)
+        public static Task VerifyAnalyzerAsync(string source, NameValueCollection additionalFiles, DiagnosticResult[] expected)
         {
-            Test test = new(additionalFiles)
+            return VerifyAnalyzerAsync(new[] { source }, additionalFiles, expected);
+        }
+
+        public static async Task VerifyAnalyzerAsync(string[] sources, NameValueCollection additionalFiles, DiagnosticResult[] expected)
+        {
+            Test test = new(additionalFiles);
+
+            foreach(string? source in sources)
             {
-                TestCode = source
-            };
+                if (source != null)
+                {
+                    test.TestState.Sources.Add(source);
+                }
+            }
 
             test.ExpectedDiagnostics.AddRange(expected);
             await test.RunAsync(CancellationToken.None);
         }
 
-        public static async Task VerifyReferenceCopAnalysis(string source, string rules, DiagnosticResult[] diagnostics)
+        public static Task VerifyReferenceCopAnalysis(string source, string rules, DiagnosticResult[] diagnostics)
+        {
+            return VerifyReferenceCopAnalysis(new[] { source }, rules, diagnostics);
+        }
+
+        public static async Task VerifyReferenceCopAnalysis(string[] sources, string rules, DiagnosticResult[] diagnostics)
         {
             NameValueCollection additionalFiles = new()
             {
@@ -36,7 +51,7 @@ namespace ReferenceCopAnalyzer.Test.Verifiers
             };
 
             await VerifyAnalyzerAsync(
-                source,
+                sources,
                 additionalFiles,
                 diagnostics);
         }
